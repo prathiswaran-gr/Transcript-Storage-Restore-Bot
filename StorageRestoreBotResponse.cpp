@@ -15,28 +15,20 @@ SENDER_LIST = {"systemgenerated@mailer.zohocliq.com","eu-systemgenerated@eu-mail
 // supported from address with multiple DC's
 MAIL_LIST = list();
 // starting value
+issueStartValue = 1;
 RESTORE_SUBJECT_TEMPLATE = "ZohoChat - Transcript Restore Error";
 STORAGE_SUBJECT_TEMPLATE = "ZohoChat - Transcript Storage Error";
 FIELDS = "subject,fromAddress,folderId,messageId";
 LIMIT = 5000;
 // gets number of mails per call
-transcriptRestoreDomainMap = Map();
-transcriptStorageDomainMap = Map();
+transcriptRestoreMap = Map();
+transcriptStorageMap = Map();
 restoreSerialNumber = 1;
 storageSerialNumber = 1;
 restoreRowsList = list();
 storageRowsList = list();
-transcriptRestoreDomainMap.put("us",Map());
-transcriptRestoreDomainMap.put("eu",Map());
-transcriptRestoreDomainMap.put("in",Map());
-transcriptRestoreDomainMap.put("au",Map());
-transcriptStorageDomainMap.put("us",Map());
-transcriptStorageDomainMap.put("eu",Map());
-transcriptStorageDomainMap.put("in",Map());
-transcriptStorageDomainMap.put("au",Map());
-issueStartValue = 1;
 ITERATIONS = "".leftPad(1);
-// Number of iterations. At max 1000 mails per response
+// Number of iterations. At max 5000 mails per response
 ITERATIONS = ITERATIONS.toList("");
 for each  mailDetials in ITERATIONS
 {
@@ -114,17 +106,16 @@ for each  mail in MAIL_LIST
 			DC = "au";
 		}
 		chatMapValue = Map();
-		chatDetailsMap = Map();
+		chatMapValue.put("dc",DC);
 		if(transcriptErrorType.equals("Transcript Restore Error"))
 		{
-			chatDetailsMap = transcriptRestoreDomainMap.get(DC);
-			if(!chatDetailsMap.containsKey(chatId))
+			if(!transcriptRestoreMap.containsKey(chatId))
 			{
 				chatMapValue.put("numberOfOccurences",1);
 			}
 			else
 			{
-				numberOfOccurencesPreviously = toNumber(chatDetailsMap.get(chatId).get("numberOfOccurences"));
+				numberOfOccurencesPreviously = toNumber(transcriptRestoreMap.get(chatId).get("numberOfOccurences"));
 				chatMapValue.put("numberOfOccurences",numberOfOccurencesPreviously + 1);
 			}
 			getEmailContent = invokeurl
@@ -147,18 +138,17 @@ for each  mail in MAIL_LIST
 				exception = exception + char;
 			}
 			chatMapValue.put("exception",exception);
-			chatDetailsMap.put(chatId,chatMapValue);
+			transcriptRestoreMap.put(chatId,chatMapValue);
 		}
 		else if(transcriptErrorType.equals("Transcript Storage Error"))
 		{
-			chatDetailsMap = transcriptStorageDomainMap.get(DC);
-			if(!chatDetailsMap.containsKey(chatId))
+			if(!transcriptStorageMap.containsKey(chatId))
 			{
 				chatMapValue.put("numberOfOccurences",1);
 			}
 			else
 			{
-				numberOfOccurencesPreviously = toNumber(chatDetailsMap.get(chatId).get("numberOfOccurences"));
+				numberOfOccurencesPreviously = toNumber(transcriptStorageMap.get(chatId).get("numberOfOccurences"));
 				chatMapValue.put("numberOfOccurences",numberOfOccurencesPreviously + 1);
 			}
 			getEmailContent = invokeurl
@@ -182,137 +172,118 @@ for each  mail in MAIL_LIST
 				exception = exception + char;
 			}
 			chatMapValue.put("exception",exception);
-			chatDetailsMap.put(chatId,chatMapValue);
+			transcriptStorageMap.put(chatId,chatMapValue);
 		}
 	}
 }
-domainList = transcriptRestoreDomainMap.keys();
-domainIndex = 0;
-numberOfRecordsPerRow = "".leftPad(1).toList("");
-for each  domain in transcriptRestoreDomainMap
+sortKey = "numberOfOccurences";
+transcriptRestoreOccurencesList = list();
+for each  chatDetails in transcriptRestoreMap
 {
-	// Datastructure {"in":{"chat_id":{"count":8,exception:"something"}},"com":{"chat_id":{"count":8,exception:"something"}}}
-	chatList = domain.keys();
-	// List Chat ID's for each domain
-	chatIndex = 0;
-	iterations = toNumber(chatList.size() / numberOfRecordsPerRow.size());
-	if(chatList.size() % numberOfRecordsPerRow.size() != 0)
+	sortKeyValue = chatDetails.get(sortKey);
+	transcriptRestoreOccurencesList.add(sortKeyValue);
+}
+sortedOccurencesList = transcriptRestoreOccurencesList.sort(false);
+sortedChatIdBySortedKeyListForRestore = list();
+chatIdList = transcriptRestoreMap.keys();
+visitedChatIdList = list();
+for each  occurrence in sortedOccurencesList
+{
+	for each  chatDetails in transcriptRestoreMap
 	{
-		iterations = iterations + 1;
-	}
-	iterations = "".leftPad(iterations).toList("");
-	for each  something in iterations
-	{
-		chatIdText = "";
-		dcText = "";
-		snoText = "";
-		chatIdText = "";
-		countText = "";
-		exceptionText = "";
-		if(chatList.size() > 0)
+		sortKeyValue = chatDetails.get(sortKey);
+		if(occurrence == sortKeyValue)
 		{
-			for each  index in numberOfRecordsPerRow
+			for each  chatId in chatIdList
 			{
-				chatId = chatList.get(chatIndex);
-				chatDetails = domain.get(chatId);
-				snoText = snoText + restoreSerialNumber + "\n";
-				chatIdText = chatIdText + chatList.get(chatIndex) + "\n";
-				dcText = dcText + domainList.get(domainIndex) + "\n";
-				countText = countText + chatDetails.get("numberOfOccurences") + "\n";
-				exceptionText = exceptionText + chatDetails.get("exception") + "\n";
-				restoreSerialNumber = restoreSerialNumber + 1;
-				chatIndex = chatIndex + 1;
-				if(chatIndex >= chatList.size())
+				if(visitedChatIdList.contains(chatId))
 				{
+					continue;
+				}
+				chatIdDetails = transcriptRestoreMap.get(chatId);
+				if(chatIdDetails.get(sortKey) == sortKeyValue)
+				{
+					sortedChatIdBySortedKeyListForRestore.add(chatId);
+					visitedChatIdList.add(chatId);
 					break;
 				}
 			}
-			snoText = snoText.subString(0,snoText.length() - 1);
-			chatIdText = chatIdText.subString(0,chatIdText.length() - 1);
-			dcText = dcText.subString(0,dcText.length() - 1);
-			countText = countText.subString(0,countText.length() - 1);
-			exceptionText = exceptionText.subString(0,exceptionText.length() - 1);
-			rowsList0 = Map();
-			rowsList0.put("*S.no*",snoText);
-			rowsList0.put("Chat ID",chatIdText);
-			rowsList0.put("DC",dcText);
-			rowsList0.put("Occurrences",countText);
-			rowsList0.put("Exception",exceptionText);
-			restoreRowsList.add(rowsList0);
 		}
 	}
-	domainIndex = domainIndex + 1;
 }
-domainIndex = 0;
-for each  domain in transcriptStorageDomainMap
+for each  chatId in sortedChatIdBySortedKeyListForRestore
 {
-	// Datastructure {"in":{"chat_id":{"count":8,exception:"something"}},"com":{"chat_id":{"count":8,exception:"something"}}}
-	chatList = domain.keys();
-	// List Chat ID's for each domain
-	chatIndex = 0;
-	iterations = toNumber(chatList.size() / numberOfRecordsPerRow.size());
-	if(chatList.size() % numberOfRecordsPerRow.size() != 0)
+	chatDetails = transcriptRestoreMap.get(chatId);
+	rowsList0 = Map();
+	rowsList0.put("*S.no*",restoreSerialNumber);
+	rowsList0.put("Chat ID",chatId);
+	rowsList0.put("DC",chatDetails.get("dc"));
+	rowsList0.put("Occurrences",chatDetails.get("numberOfOccurences"));
+	rowsList0.put("Exception",chatDetails.get("exception"));
+	restoreRowsList.add(rowsList0);
+	restoreSerialNumber = restoreSerialNumber + 1;
+}
+transcriptStorageOccurencesList = list();
+for each  chatDetails in transcriptStorageMap
+{
+	sortKeyValue = chatDetails.get(sortKey);
+	transcriptStorageOccurencesList.add(sortKeyValue);
+}
+sortedOccurencesList = transcriptStorageOccurencesList.sort(false);
+sortedChatIdBySortedKeyListForStorage = list();
+chatIdList = transcriptStorageMap.keys();
+visitedChatIdList = list();
+test = false;
+for each  occurrence in sortedOccurencesList
+{
+	for each  chatDetails in transcriptStorageMap
 	{
-		iterations = iterations + 1;
-	}
-	iterations = "".leftPad(iterations).toList("");
-	for each  something in iterations
-	{
-		chatIdText = "";
-		dcText = "";
-		snoText = "";
-		chatIdText = "";
-		countText = "";
-		exceptionText = "";
-		if(chatList.size() > 0)
+		sortKeyValue = chatDetails.get(sortKey);
+		if(occurrence == sortKeyValue)
 		{
-			for each  index in numberOfRecordsPerRow
+			for each  chatId in chatIdList
 			{
-				chatId = chatList.get(chatIndex);
-				chatDetails = domain.get(chatId);
-				snoText = snoText + storageSerialNumber + "\n";
-				chatIdText = chatIdText + chatList.get(chatIndex) + "\n";
-				dcText = dcText + domainList.get(domainIndex) + "\n";
-				countText = countText + chatDetails.get("numberOfOccurences") + "\n";
-				exceptionText = exceptionText + chatDetails.get("exception") + "\n";
-				storageSerialNumber = storageSerialNumber + 1;
-				chatIndex = chatIndex + 1;
-				if(chatIndex >= chatList.size())
+				if(visitedChatIdList.contains(chatId))
 				{
+					continue;
+				}
+				chatIdDetails = transcriptStorageMap.get(chatId);
+				if(chatIdDetails.get(sortKey) == sortKeyValue)
+				{
+					sortedChatIdBySortedKeyListForStorage.add(chatId);
+					visitedChatIdList.add(chatId);
 					break;
 				}
 			}
-			snoText = snoText.subString(0,snoText.length() - 1);
-			chatIdText = chatIdText.subString(0,chatIdText.length() - 1);
-			dcText = dcText.subString(0,dcText.length() - 1);
-			countText = countText.subString(0,countText.length() - 1);
-			exceptionText = exceptionText.subString(0,exceptionText.length() - 1);
+		}
+	}
+}
+
+for each chatId in sortedChatIdBySortedKeyListForStorage {
+			chatDetails = transcriptStorageMap.get(chatId);
 			rowsList0 = Map();
-			rowsList0.put("*S.no*",snoText);
-			rowsList0.put("Chat ID",chatIdText);
-			rowsList0.put("DC",dcText);
-			rowsList0.put("Occurrences",countText);
-			rowsList0.put("Exception",exceptionText);
+			rowsList0.put("*S.no*",storageSerialNumber);
+			rowsList0.put("Chat ID",chatId);
+			rowsList0.put("DC",chatDetails.get("dc"));
+			rowsList0.put("Occurrences",chatDetails.get("numberOfOccurences"));
+			rowsList0.put("Exception",chatDetails.get("exception"));
 			storageRowsList.add(rowsList0);
-		}
-	}
-	domainIndex = domainIndex + 1;
+			storageSerialNumber = storageSerialNumber + 1;
 }
-restoreSerialNumber = restoreSerialNumber - 1;
-storageSerialNumber = storageSerialNumber - 1;
 response = Map();
 if(storageRowsList.size() == 0)
 {
-	response.put("text","Transcript stats - " + toString(now,"d/MM/yyyy","Asia/Calcutta") + "\nNumber of restore errors : " + toNumber(restoreSerialNumber));
+	response.put("text","Transcript stats - " + toString(now,"d/MM/yyyy","Asia/Calcutta") + "\nNumber of restore errors : " + toNumber(restoreSerialNumber - 1));
 }
 else if(restoreRowsList.size() == 0)
 {
-	response.put("text","Transcript stats - " + toString(now,"d/MM/yyyy","Asia/Calcutta") + "\nNumber of storage errors : " + toNumber(storageSerialNumber));
+	response.put("text","Transcript stats - " + toString(now,"d/MM/yyyy","Asia/Calcutta") + "\nNumber of storage errors : " + toNumber(storageSerialNumber - 1));
 }
 else
 {
-	response.put("text","Transcript stats - " + toString(now,"d/MM/yyyy","Asia/Calcutta") + "\nNumber of restore errors : " + toNumber(restoreSerialNumber) + "\nNumber of storage errors : " + toNumber(storageSerialNumber));
+	response.put("text","Transcript stats - " + toString(now,"d/MM/yyyy","Asia/Calcutta") + "\nNumber of restore errors : " + toNumber(restoreSerialNumber - 1) + "\nNumber of storage errors : " + toNumber(storageSerialNumber - 1));
 }
+
 card = Map();
 card.put("theme","prompt");
 card.put("title","*Transcript Storage/Restore Errors* ❌");
