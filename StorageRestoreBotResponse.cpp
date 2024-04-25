@@ -312,7 +312,7 @@ for each  itr in iterations
 	rowsList0.put("*S.no*",snoText);
 	rowsList0.put("Chat ID",chatIdText);
 	rowsList0.put("DC",dcText);
-	rowsList0.put("Occurrences",countText);
+	rowsList0.put("Occurrences",countText)
 	rowsList0.put("Exception",exceptionText);
 	storageRowsList.add(rowsList0);
 }
